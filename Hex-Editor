@@ -1,0 +1,159 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <vector>
+#include <string>
+#include <bitset>
+
+// Funktion zur Anzeige des Hauptmenüs
+void displayMenu() {
+    std::cout << "\n==============================" << std::endl;
+    std::cout << " HEX/CHAR/Binary-Editor " << std::endl;
+    std::cout << "==============================" << std::endl;
+    std::cout << "1. Datei anzeigen (Binär/HEX/CHAR)" << std::endl;
+    std::cout << "2. Byte bearbeiten" << std::endl;
+    std::cout << "3. Datei speichern" << std::endl;
+    std::cout << "4. Beenden" << std::endl;
+    std::cout << "Wählen Sie eine Option: ";
+}
+
+// Funktion zur Darstellung des Datei-Inhalts
+void displayFileContent(const std::vector<unsigned char>& buffer) {
+    if (buffer.empty()) {
+        std::cerr << "Fehler: Datei ist leer oder konnte nicht geladen werden." << std::endl;
+        return;
+    }
+
+    const size_t bytesPerLine = 8; // Anzahl der Bytes pro Zeile
+    std::cout << "\nIndex      Binär              HEX   CHAR" << std::endl;
+    std::cout << "-------------------------------------------------" << std::endl;
+
+    for (size_t i = 0; i < buffer.size(); ++i) {
+        // Index der aktuellen Position
+        std::cout << std::setw(8) << std::setfill('0') << i << "  ";
+
+        // Binär-Darstellung des Bytes
+        std::cout << std::bitset<8>(buffer[i]) << "  ";
+
+        // Hexadezimale Darstellung
+        std::cout << std::dec << std::setw(3) << std::setfill('0') << static_cast<int>(buffer[i]) << "    ";
+
+        // Zeichenweise Darstellung, nicht druckbare Zeichen als '.'
+        char ch = isprint(buffer[i]) ? buffer[i] : '.';
+        std::cout << ch << std::endl;
+
+        // Zeilenumbruch nach einer definierten Anzahl von Bytes
+        if ((i + 1) % bytesPerLine == 0) {
+            std::cout << std::endl;
+        }
+    }
+}
+
+// Funktion zur Bearbeitung eines Bytes innerhalb der Datei
+void editByte(std::vector<unsigned char>& buffer) {
+    size_t position;
+    std::string newValue;
+
+    if (buffer.empty()) {
+        std::cerr << "Fehler: Keine Datei geladen!" << std::endl;
+        return;
+    }
+
+    // Eingabevalidierung: Wiederholung bis eine gültige Position eingegeben wird
+    while (true) {
+        std::cout << "Position (Byte-Index): ";
+        std::cin >> position;
+
+        if (std::cin.fail() || position >= buffer.size()) {
+            std::cin.clear(); // Fehlerstatus zurücksetzen
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ungültige Eingabe verwerfen
+            std::cerr << "Ungültige Position! Bitte erneut eingeben." << std::endl;
+        }
+        else {
+            break;
+        }
+    }
+
+    // Neuen Wert einlesen
+    std::cout << "Neuer Wert eingeben (Bin, Hexadezimal oder Zeichen): ";
+    std::cin >> newValue;
+
+    // Verarbeitung der Eingabe in verschiedenen Formaten
+    if (newValue.size() == 1) {
+        buffer[position] = static_cast<unsigned char>(newValue[0]);
+    }
+    else if (newValue.find("0x") == 0 || newValue.find("0X") == 0) {
+        buffer[position] = static_cast<unsigned char>(std::stoi(newValue, nullptr, 16));
+    }
+    else if (newValue.find("b") == 0) {
+        buffer[position] = static_cast<unsigned char>(std::stoi(newValue.substr(1), nullptr, 2));
+    }
+    else {
+        std::cerr << "Ungültige Eingabe! Bitte geben Sie einen Wert als Zeichen, Hexadezimal (0x..) oder Binär (b...) an." << std::endl;
+        return;
+    }
+    std::cout << "Wert erfolgreich aktualisiert!" << std::endl;
+}
+
+// Hauptprogramm
+int main(int argc, char* argv[]) {
+    std::string filename;
+
+    // Überprüfung, ob ein Dateiname als Argument übergeben wurde
+    if (argc < 2) {
+        std::cout << "Bitte geben Sie den Dateinamen ein: ";
+        std::cin >> filename;
+    }
+    else {
+        filename = argv[1];
+    }
+
+    std::vector<unsigned char> buffer;
+    std::ifstream file(filename, std::ios::binary);
+
+    // Überprüfung, ob die Datei geöffnet werden kann
+    if (!file) {
+        std::cerr << "Fehler: Datei konnte nicht geöffnet werden!" << std::endl;
+        return 1;
+    }
+
+    // Laden der Datei in den Puffer
+    buffer.assign(std::istreambuf_iterator<char>(file), {});
+    std::cout << "\nDatei " << filename << " erfolgreich geladen!" << std::endl;
+
+    bool running = true;
+    while (running) {
+        displayMenu();
+        int choice;
+        std::cin >> choice;
+
+        switch (choice) {
+        case 1:
+            displayFileContent(buffer);
+            break;
+        case 2:
+            editByte(buffer);
+            break;
+        case 3: {
+            // Datei speichern
+            std::ofstream outFile(filename, std::ios::binary);
+
+            if (!outFile) {
+                std::cerr << "Fehler beim Speichern der Datei!" << std::endl;
+                break;
+            }
+
+            outFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
+            std::cout << "Datei gespeichert!" << std::endl;
+            break;
+        }
+        case 4:
+            std::cout << "Programm wird beendet..." << std::endl;
+            running = false;
+            break;
+        default:
+            std::cerr << "Ungültige Option! Bitte erneut versuchen." << std::endl;
+        }
+    }
+    return 0;
+}
